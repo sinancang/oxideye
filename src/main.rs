@@ -2,17 +2,43 @@ use crossbeam_channel::{Sender, unbounded};
 use rdev::{Event, EventType, listen};
 use std::thread;
 
+use clap::Parser;
+use serde::Deserialize;
+use std::fs;
+
+
+#[derive(Deserialize)]
+struct Config {
+    logging: LoggingConfig,
+}
+
+#[derive(Deserialize)]
+struct LoggingConfig {
+    path: String,
+    period_ms: i32,
+}
+
+#[derive(Parser)]
+struct Cli {
+    #[arg(short, long, default_value = "config/default.toml")]
+    config: String,
+}
+
 #[derive(Default)]
 struct State {
     mouse_distance: usize,
     wheel_distance: usize,
     button_presses: usize,
     key_presses: usize,
-    // TODO: key and button press total durations
-    // potential TODO: per-key/button stats
 }
 
+
 fn main() {
+    let args = Cli::parse();
+    let config_contents = fs::read_to_string(args.config).unwrap();
+    let config: Config = toml::from_str(&config_contents).unwrap();
+    println!("Logging to {}", config.logging.path);
+
     let (tx, rx) = unbounded::<rdev::EventType>();
     thread::spawn(move || {
         let mut s = State::default();

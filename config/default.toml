@@ -1,0 +1,3 @@
+[logging]
+path = "/var/log/app.log"
+period_ms = 100
