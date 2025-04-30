@@ -1,4 +1,4 @@
-use crossbeam_channel::{Sender, unbounded};
+use crossbeam_channel::unbounded;
 use rdev::{Event, EventType, listen};
 use std::thread;
 use std::sync::{Arc, Mutex};
@@ -58,7 +58,11 @@ fn main() {
     });
 
     // callback for event listener
-    let callback = move |ev: Event| send_event(&tx, &ev);
+    let callback = {
+        move |ev: Event| {
+            tx.send(ev.event_type.clone()).ok();
+        }
+    };
     listen(callback).unwrap();
 }
 
@@ -93,10 +97,6 @@ fn logger_thread(log_path: String, log_period: i32, state: Arc<Mutex<State>>) {
         // Reset counters
         *s = State::default();
     }
-}
-
-fn send_event(tx: &Sender<EventType>, ev: &Event) {
-    tx.send(ev.event_type.clone()).ok();
 }
 
 fn process_event(event: EventType, s: &mut State, first_mouse_move: &mut bool, last_mouse_pos: &mut (f64, f64)) {
