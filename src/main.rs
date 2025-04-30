@@ -40,51 +40,59 @@ fn main() {
     let config: Config = toml::from_str(&config_contents).unwrap();
     println!("Logging to {} every {} milliseconds", config.logging.path, config.logging.period_ms);
 
-    let log_path = config.logging.path.clone();
-    let log_period = config.logging.period_ms;
+    let log_path: String = config.logging.path.clone();
+    let log_period: i32 = config.logging.period_ms;
 
-    let state = Arc::new(Mutex::new(State::default()));
-    let state_clone = Arc::clone(&state);
+    let state_for_event_listener = Arc::new(Mutex::new(State::default()));
+    let state_for_logger = Arc::clone(&state_for_event_listener);
 
     // logger thread
     thread::spawn(move || {
-        loop {
-            thread::sleep(std::time::Duration::from_millis(log_period as u64));
-
-            let mut s = state_clone.lock().unwrap();
-            let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
-            let log = format!(
-                "[{}] Mouse Distance: {}, Wheel Spins: {}, Button Presses: {}, Key Presses: {}\n",
-                timestamp, s.mouse_distance, s.wheel_distance, s.button_presses, s.key_presses
-            );
-    
-            std::fs::OpenOptions::new()
-                .append(true)
-                .create(true)
-                .open(&log_path)
-                .and_then(|mut f| std::io::Write::write_all(&mut f, log.as_bytes()))
-                .expect("Failed to write log");
-    
-            // Reset counters
-            println!("Resetting state after logging");
-            *s = State::default();
-        }
+        logger_thread(log_path, log_period, state_for_logger);
     });
 
     // event listener thread
-    let (tx, rx) = unbounded::<rdev::EventType>();
+    let (tx, rx) = unbounded::<EventType>();
     thread::spawn(move || {
-        let mut first_mouse_move = true;
-        let mut last_mouse_pos = (0.0, 0.0);
-        for event in rx {
-            let mut s = state.lock().unwrap();
-            process_event(event, &mut s, &mut first_mouse_move, &mut last_mouse_pos);
-        }
+        event_listener(state_for_event_listener, rx);
     });
 
     // callback for event listener
     let callback = move |ev: Event| send_event(&tx, &ev);
     listen(callback).unwrap();
+}
+
+fn event_listener(state: Arc<Mutex<State>>, rx: crossbeam_channel::Receiver<EventType>) {
+    let mut first_mouse_move = true;
+    let mut last_mouse_pos = (0.0, 0.0);
+    for event in rx {
+        let mut s = state.lock().unwrap();
+        process_event(event, &mut s, &mut first_mouse_move, &mut last_mouse_pos);
+    }
+}
+
+fn logger_thread(log_path: String, log_period: i32, state: Arc<Mutex<State>>) {
+    loop {
+        thread::sleep(std::time::Duration::from_millis(log_period as u64));
+
+        let mut s = state.lock().unwrap();
+        let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+        let log = format!(
+            "[{}] Mouse Distance: {}, Wheel Spins: {}, Button Presses: {}, Key Presses: {}\n",
+            timestamp, s.mouse_distance, s.wheel_distance, s.button_presses, s.key_presses
+        );
+        println!("Logging: {}", log);
+
+        std::fs::OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open(&log_path)
+            .and_then(|mut f| std::io::Write::write_all(&mut f, log.as_bytes()))
+            .expect("Failed to write log");
+
+        // Reset counters
+        *s = State::default();
+    }
 }
 
 fn send_event(tx: &Sender<EventType>, ev: &Event) {
