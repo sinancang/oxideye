@@ -21,15 +21,16 @@ Down the line I intend to add:
 
 ## Usage
 
-1. Clone the repository:
+### Clone the repository:
     ```bash
     git clone https://github.com/sinancang/oxideye.git
     cd oxideye
     ```
 
-2. Run the project:
+### Run the project:
     ```bash
     cargo run
     ```
 
-Note: Ensure you have Rust installed on your system. You can install it from [rust-lang.org](https://www.rust-lang.org/).
+### Let it run!
+oxideye will, by default write logs to `oxideye/telem.log` every `100000` milliseconds. Both of these are configurable via modifying `config/default.toml`
