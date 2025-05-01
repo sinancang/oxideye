@@ -1,12 +1,13 @@
-use crossbeam_channel::unbounded;
-use rdev::{Event, EventType, listen};
-use std::thread;
-use std::sync::{Arc, Mutex};
 use chrono::Local;
 use clap::Parser;
+use crossbeam_channel::unbounded;
+use env_logger::Builder;
+use log::{LevelFilter, debug, info};
+use rdev::{Event, EventType, listen};
 use serde::Deserialize;
 use std::fs;
-
+use std::sync::{Arc, Mutex};
+use std::thread;
 
 #[derive(Deserialize)]
 struct Config {
@@ -16,32 +17,54 @@ struct Config {
 #[derive(Deserialize)]
 struct LoggingConfig {
     path: String,
-    period_ms: i32,
+    period_ms: u64,
 }
 
 #[derive(Parser)]
 struct Cli {
     #[arg(short, long, default_value = "config/default.toml")]
     config: String,
+
+    #[arg(long, default_value = "info", value_parser = ["debug", "info"])]
+    log_level: String,
 }
 
 #[derive(Default)]
 struct State {
-    mouse_distance: usize,
+    mouse_distance: f64,
     wheel_distance: usize,
     button_presses: usize,
     key_presses: usize,
 }
 
+fn init_logger(log_level: &str) {
+    let level = match log_level.to_lowercase().as_str() {
+        "trace" => LevelFilter::Trace,
+        "debug" => LevelFilter::Debug,
+        "info" => LevelFilter::Info,
+        "warn" => LevelFilter::Warn,
+        "error" => LevelFilter::Error,
+        _ => LevelFilter::Info, // default
+    };
+
+    Builder::new().filter(None, level).init();
+}
 
 fn main() {
+    env_logger::init();
     let args = Cli::parse();
+    init_logger(&args.log_level);
+
     let config_contents = fs::read_to_string(args.config).unwrap();
     let config: Config = toml::from_str(&config_contents).unwrap();
-    println!("Logging to {} every {} milliseconds", config.logging.path, config.logging.period_ms);
+    
+    info!(
+        "Logging to {} every {} milliseconds",
+        config.logging.path, config.logging.period_ms
+    );
 
     let log_path: String = config.logging.path.clone();
-    let log_period: i32 = config.logging.period_ms;
+    let log_period: u64 = config.logging.period_ms;
 
     let state_for_event_listener = Arc::new(Mutex::new(State::default()));
     let state_for_logger = Arc::clone(&state_for_event_listener);
@@ -75,7 +98,7 @@ fn event_listener(state: Arc<Mutex<State>>, rx: crossbeam_channel::Receiver<Even
     }
 }
 
-fn logger_thread(log_path: String, log_period: i32, state: Arc<Mutex<State>>) {
+fn logger_thread(log_path: String, log_period: u64, state: Arc<Mutex<State>>) {
     loop {
         thread::sleep(std::time::Duration::from_millis(log_period as u64));
 
@@ -85,7 +108,7 @@ fn logger_thread(log_path: String, log_period: i32, state: Arc<Mutex<State>>) {
             "[{}] Mouse Distance: {}, Wheel Spins: {}, Button Presses: {}, Key Presses: {}\n",
             timestamp, s.mouse_distance, s.wheel_distance, s.button_presses, s.key_presses
         );
-        println!("Logging: {}", log);
+        info!("Flushing counts to disk: {}", log);
 
         std::fs::OpenOptions::new()
             .append(true)
@@ -99,13 +122,18 @@ fn logger_thread(log_path: String, log_period: i32, state: Arc<Mutex<State>>) {
     }
 }
 
-fn process_event(event: EventType, s: &mut State, first_mouse_move: &mut bool, last_mouse_pos: &mut (f64, f64)) {
+fn process_event(
+    event: EventType,
+    s: &mut State,
+    first_mouse_move: &mut bool,
+    last_mouse_pos: &mut (f64, f64),
+) {
     match event {
         EventType::MouseMove { x, y } => {
             let mut distance = 0.0;
             if !*first_mouse_move {
                 distance = ((x - last_mouse_pos.0).powi(2) + (y - last_mouse_pos.1).powi(2)).sqrt();
-                println!(
+                debug!(
                     "Mouse moved from ({}, {}) to ({}, {}), Distance: {}",
                     last_mouse_pos.0, last_mouse_pos.1, x, y, distance
                 );
@@ -114,17 +142,17 @@ fn process_event(event: EventType, s: &mut State, first_mouse_move: &mut bool, l
                 *last_mouse_pos = (x, y);
                 *first_mouse_move = false;
             }
-            s.mouse_distance += distance as usize;
+            s.mouse_distance += distance; // 
         }
         EventType::Wheel { delta_x, delta_y } => {
             s.wheel_distance += (delta_x.abs() + delta_y.abs()) as usize;
-            println!("Wheel moved by ({}, {})", delta_x, delta_y);
+            debug!("Wheel moved by ({}, {})", delta_x, delta_y);
         }
         EventType::ButtonPress(_) => s.button_presses += 1,
         EventType::KeyPress(_) => s.key_presses += 1,
         _ => {}
     }
-    println!(
+    debug!(
         "Mouse Distance: {}, Wheel Spins: {}, Button Presses: {}, Key Presses: {}",
         s.mouse_distance, s.wheel_distance, s.button_presses, s.key_presses
     );
