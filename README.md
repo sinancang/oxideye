@@ -1,26 +1,27 @@
-# (WIP) rust-daemon
+# oxideye 👁️‍🗨️
 
-This is a toy project for a Rust daemon to record and log computer use metrics.\
-The main goal is to develop some knowledge and working experience with Rust 🦀
+"oxideye" is a work in progress that records and logs computer peripheral usage statistics (think mouse distance, key/button press, etc.)\
+The main goal in developing this for me is:
+1. Learn Rust development 🦀
+2. Discover how many times my mouse goes to the moon and back every week🌕
 
-## Planned Features
-- Listen to OS and log PC usage stats such as: total mouse_distance, wheel_distance, button/key presses, etc. (Partially done)
-- Log them periodically either to a file or a light DB (TODO)
-- CLI command to fetch all logged metrics and print them to impress your friends 😄 (TODO)
+Currently the program will listen to your peripherals and periodically log:
+- Mouse distance (in pixels)
+- Wheel spins
+- Button presses
+- Key presses
 
-## Stretch Goals
-- Share metrics across different computers by synchronizing with a metrics server 
-    - Requires highly available metrics client, authentication, scheduled uploads and downloads
-- Enable third-party integrations via "extensions" (e.g. Spotify listen hours, Apple watch health metrics, Teams messages, etc.)
+Down the line I intend to add the following:
+- CLI tool to aggregate and view the information
+- Notifications on milestones (when stats exceed certain thresholds)
+- Stat sharing across multiple devices
 
 ## Usage
 
-To run the Rust daemon, follow these steps:
-
 1. Clone the repository:
     ```bash
-    git clone https://github.com/your-username/rust-daemon.git
-    cd rust-daemon
+    git clone https://github.com/sinancang/oxideye.git
+    cd oxideye
     ```
 
 2. Run the project:
