@@ -109,7 +109,7 @@ fn logger_thread(log_path: String, log_period: u64, state: Arc<Mutex<State>>) {
         let mut s = state.lock().expect("Mutex poisoned while locking state");
         let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
         let log = format!(
-            "[{}] Mouse Distance: {}, Wheel Spins: {}, Button Presses: {}, Key Presses: {}\n",
+            "[{}] Mouse Distance: {}, Wheel Spins: {}, Button Presses: {}, Key Presses: {}",
             timestamp, s.mouse_distance, s.wheel_distance, s.button_presses, s.key_presses
         );
         info!("Flushing counts to disk: {}", log);
@@ -118,7 +118,7 @@ fn logger_thread(log_path: String, log_period: u64, state: Arc<Mutex<State>>) {
             .append(true)
             .create(true)
             .open(&log_path)
-            .and_then(|mut f| std::io::Write::write_all(&mut f, log.as_bytes()))
+            .and_then(|mut f| std::io::Write::write_all(&mut f, format!("{}\n", log).as_bytes()))
             .expect("Failed to write log");
 
         *s = State::default();
