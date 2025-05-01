@@ -2,7 +2,7 @@ use chrono::Local;
 use clap::Parser;
 use crossbeam_channel::unbounded;
 use env_logger::Builder;
-use log::{LevelFilter, debug, info};
+use log::{LevelFilter, debug, error, info};
 use rdev::{Event, EventType, listen};
 use serde::Deserialize;
 use std::fs;
@@ -31,10 +31,10 @@ struct Cli {
 
 #[derive(Default)]
 struct State {
-    mouse_distance: f64,
-    wheel_distance: usize,
-    button_presses: usize,
-    key_presses: usize,
+    mouse_distance: i64,
+    wheel_distance: i64,
+    button_presses: i64,
+    key_presses: i64,
 }
 
 fn init_logger(log_level: &str) {
@@ -51,58 +51,62 @@ fn init_logger(log_level: &str) {
 }
 
 fn main() {
-    env_logger::init();
     let args = Cli::parse();
     init_logger(&args.log_level);
 
-    let config_contents = fs::read_to_string(args.config).unwrap();
-    let config: Config = toml::from_str(&config_contents).unwrap();
-    
-    info!(
-        "Logging to {} every {} milliseconds",
-        config.logging.path, config.logging.period_ms
-    );
+    if !std::path::Path::new(&args.config).exists() {
+        error!("Config file does not exist: {}", args.config);
+        std::process::exit(1);
+    }
+    let config_contents = fs::read_to_string(args.config.clone())
+        .unwrap_or_else(|_| panic!("Failed to read config file: {}", args.config));
+    let config: Config =
+        toml::from_str(&config_contents).expect("Failed to parse config from TOML");
 
     let log_path: String = config.logging.path;
     let log_period: u64 = config.logging.period_ms;
+    info!("Log level: {}", args.log_level);
+    info!("Logging to {} every {} milliseconds", log_path, log_period);
 
     let state_for_event_listener = Arc::new(Mutex::new(State::default()));
     let state_for_logger = Arc::clone(&state_for_event_listener);
 
-    // logger thread
     thread::spawn(move || {
         logger_thread(log_path, log_period, state_for_logger);
     });
 
-    // event listener thread
     let (tx, rx) = unbounded::<EventType>();
     thread::spawn(move || {
         event_listener(state_for_event_listener, rx);
     });
 
-    // callback for event listener
     let callback = {
         move |ev: Event| {
             tx.send(ev.event_type).ok();
         }
     };
-    listen(callback).unwrap();
+    match listen(callback) {
+        Ok(_) => {}
+        Err(error) => {
+            error!("Error occurred while listening for events: {:?}", error);
+        }
+    }
 }
 
 fn event_listener(state: Arc<Mutex<State>>, rx: crossbeam_channel::Receiver<EventType>) {
     let mut first_mouse_move = true;
     let mut last_mouse_pos = (0.0, 0.0);
     for event in rx {
-        let mut s = state.lock().unwrap();
+        let mut s = state.lock().expect("Mutex poisoned while locking state");
         process_event(event, &mut s, &mut first_mouse_move, &mut last_mouse_pos);
     }
 }
 
 fn logger_thread(log_path: String, log_period: u64, state: Arc<Mutex<State>>) {
     loop {
-        thread::sleep(std::time::Duration::from_millis(log_period as u64));
+        thread::sleep(std::time::Duration::from_millis(log_period));
 
-        let mut s = state.lock().unwrap();
+        let mut s = state.lock().expect("Mutex poisoned while locking state");
         let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
         let log = format!(
             "[{}] Mouse Distance: {}, Wheel Spins: {}, Button Presses: {}, Key Presses: {}\n",
@@ -117,7 +121,6 @@ fn logger_thread(log_path: String, log_period: u64, state: Arc<Mutex<State>>) {
             .and_then(|mut f| std::io::Write::write_all(&mut f, log.as_bytes()))
             .expect("Failed to write log");
 
-        // Reset counters
         *s = State::default();
     }
 }
@@ -142,10 +145,10 @@ fn process_event(
                 *last_mouse_pos = (x, y);
                 *first_mouse_move = false;
             }
-            s.mouse_distance += distance; // 
+            s.mouse_distance += distance as i64; // losing 1 pixel of precision here doesn't matter
         }
         EventType::Wheel { delta_x, delta_y } => {
-            s.wheel_distance += (delta_x.abs() + delta_y.abs()) as usize;
+            s.wheel_distance += delta_x.abs() + delta_y.abs();
             debug!("Wheel moved by ({}, {})", delta_x, delta_y);
         }
         EventType::ButtonPress(_) => s.button_presses += 1,
