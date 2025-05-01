@@ -63,7 +63,7 @@ fn main() {
         config.logging.path, config.logging.period_ms
     );
 
-    let log_path: String = config.logging.path.clone();
+    let log_path: String = config.logging.path;
     let log_period: u64 = config.logging.period_ms;
 
     let state_for_event_listener = Arc::new(Mutex::new(State::default()));
@@ -83,7 +83,7 @@ fn main() {
     // callback for event listener
     let callback = {
         move |ev: Event| {
-            tx.send(ev.event_type.clone()).ok();
+            tx.send(ev.event_type).ok();
         }
     };
     listen(callback).unwrap();
