@@ -5,7 +5,10 @@ use env_logger::Builder;
 use log::{LevelFilter, debug, error, info};
 use rdev::{Event, EventType, listen};
 use serde::Deserialize;
+use serde_json::{Value, json};
 use std::fs;
+use std::fs::OpenOptions;
+use std::io::{Read, Seek, Write};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -106,22 +109,48 @@ fn logger_thread(log_path: String, log_period: u64, state: Arc<Mutex<State>>) {
     loop {
         thread::sleep(std::time::Duration::from_millis(log_period));
 
-        let mut s = state.lock().expect("Mutex poisoned while locking state");
-        let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
-        let log = format!(
-            "[{}] Mouse Distance: {}, Wheel Spins: {}, Button Presses: {}, Key Presses: {}",
-            timestamp, s.mouse_distance, s.wheel_distance, s.button_presses, s.key_presses
-        );
-        info!("Flushing counts to disk: {}", log);
+        let s = state.lock().expect("Mutex poisoned while locking state");
 
-        std::fs::OpenOptions::new()
-            .append(true)
+        // Create updated log object
+        let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+        let updated_log = json!({
+            "timestamp": timestamp,
+            "mouse_distance": s.mouse_distance,
+            "wheel_spins": s.wheel_distance,
+            "button_presses": s.button_presses,
+            "key_presses": s.key_presses
+        });
+        debug!("Updated log: {}", updated_log);
+
+        // Open and read file
+        let mut file = OpenOptions::new()
+            .read(true)
+            .write(true)
             .create(true)
             .open(&log_path)
-            .and_then(|mut f| std::io::Write::write_all(&mut f, format!("{}\n", log).as_bytes()))
-            .expect("Failed to write log");
+            .expect("Failed to open log file");
 
-        *s = State::default();
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)
+            .expect("Failed to read file");
+
+        let data: Value = if contents.trim().is_empty() {
+            updated_log.clone()
+        } else {
+            let mut val: Value = serde_json::from_str(&contents).unwrap_or(json!({}));
+            val["timestamp"] = updated_log["timestamp"].clone();
+            val["mouse_distance"] = updated_log["mouse_distance"].clone();
+            val["wheel_spins"] = updated_log["wheel_spins"].clone();
+            val["button_presses"] = updated_log["button_presses"].clone();
+            val["key_presses"] = updated_log["key_presses"].clone();
+            val
+        };
+
+        // Write updated JSON
+        file.set_len(0).expect("Failed to truncate file");
+        file.seek(std::io::SeekFrom::Start(0))
+            .expect("Failed to seek start");
+        write!(file, "{}", data.to_string()).expect("Failed to write updated JSON");
     }
 }
 
