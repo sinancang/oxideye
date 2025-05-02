@@ -109,24 +109,25 @@ fn logger_thread(log_path: String, log_period: u64, state: Arc<Mutex<State>>) {
     loop {
         thread::sleep(std::time::Duration::from_millis(log_period));
 
-        let s = state.lock().expect("Mutex poisoned while locking state");
+        let mut s = state.lock().expect("Mutex poisoned while locking state");
 
         // Create updated log object
         let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
-        let updated_log = json!({
+        let json_update = json!({
             "timestamp": timestamp,
             "mouse_distance": s.mouse_distance,
             "wheel_spins": s.wheel_distance,
             "button_presses": s.button_presses,
             "key_presses": s.key_presses
         });
-        debug!("Updated log: {}", updated_log);
+        debug!("Updating JSON with: {}", json_update);
 
         // Open and read file
         let mut file = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
+            .truncate(false)
             .open(&log_path)
             .expect("Failed to open log file");
 
@@ -135,14 +136,22 @@ fn logger_thread(log_path: String, log_period: u64, state: Arc<Mutex<State>>) {
             .expect("Failed to read file");
 
         let data: Value = if contents.trim().is_empty() {
-            updated_log.clone()
+            debug!(
+                "File is empty, creating new JSON object with initial values: {}",
+                json_update
+            );
+            json_update.clone()
         } else {
             let mut val: Value = serde_json::from_str(&contents).unwrap_or(json!({}));
-            val["timestamp"] = updated_log["timestamp"].clone();
-            val["mouse_distance"] = updated_log["mouse_distance"].clone();
-            val["wheel_spins"] = updated_log["wheel_spins"].clone();
-            val["button_presses"] = updated_log["button_presses"].clone();
-            val["key_presses"] = updated_log["key_presses"].clone();
+            debug!(
+                "Timestamp updated: from {} to {}",
+                val["timestamp"], json_update["timestamp"]
+            );
+            val["timestamp"] = json_update["timestamp"].clone();
+            add_field(&mut val, "mouse_distance", &json_update);
+            add_field(&mut val, "wheel_spins", &json_update);
+            add_field(&mut val, "button_presses", &json_update);
+            add_field(&mut val, "key_presses", &json_update);
             val
         };
 
@@ -150,8 +159,23 @@ fn logger_thread(log_path: String, log_period: u64, state: Arc<Mutex<State>>) {
         file.set_len(0).expect("Failed to truncate file");
         file.seek(std::io::SeekFrom::Start(0))
             .expect("Failed to seek start");
-        write!(file, "{}", data.to_string()).expect("Failed to write updated JSON");
+        write!(file, "{}", data).expect("Failed to write updated JSON");
+
+        *s = State::default();
     }
+}
+
+fn add_field(val: &mut Value, key: &str, json_update: &Value) {
+    let update = json_update.get(key).and_then(Value::as_i64).unwrap_or(0);
+    if update == 0 {
+        return;
+    }
+    let current = val.get(key).and_then(Value::as_i64).unwrap_or(0);
+    debug!(
+        "Adding field `{}` with value {} to {}",
+        key, update, current
+    );
+    val[key] = json!(current + update);
 }
 
 fn process_event(

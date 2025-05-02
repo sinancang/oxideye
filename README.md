@@ -22,15 +22,21 @@ Down the line I intend to add:
 ## Usage
 
 ### Clone the repository:
-    ```bash
-    git clone https://github.com/sinancang/oxideye.git
-    cd oxideye
-    ```
+```bash
+git clone https://github.com/sinancang/oxideye.git
+cd oxideye
+```
 
 ### Run the project:
-    ```bash
-    cargo run
-    ```
+```bash
+cargo run
+```
 
 ### Let it run!
 oxideye will, by default write logs to `oxideye/telem.log` every `100000` milliseconds. Both of these are configurable via modifying `config/default.toml`
+
+### Debug Mode
+Alternatively, run the program in debug mode to see every time the process is notified of a usage event, every time an update goes through, etc.
+```bash
+cargo run -- --log-level debug
+```
