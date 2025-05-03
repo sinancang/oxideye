@@ -1,6 +1,6 @@
 # oxideye 👁️‍🗨️
 
-"oxideye" records and logs **computer peripheral usage stats** (think mouse distance, key/button press, etc.) so you can brag to your friends about how many miles your mouse has travelled
+**oxideye** records and logs **computer peripheral usage stats** (think mouse distance, key/button press, etc.) so you can brag to your friends about how many miles your mouse has travelled
 
 ---
 **Currently** the program logs:
