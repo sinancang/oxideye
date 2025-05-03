@@ -4,7 +4,6 @@ use crossbeam_channel::unbounded;
 use env_logger::Builder;
 use log::{LevelFilter, debug, error, info};
 use rdev::{Event, EventType, listen};
-use serde::Deserialize;
 use serde_json::{Value, json};
 use std::fs;
 use std::fs::OpenOptions;
@@ -12,33 +11,9 @@ use std::io::{Read, Seek, Write};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-#[derive(Deserialize)]
-struct Config {
-    logging: LoggingConfig,
-}
+use oxideye::processing::process_event;
+use oxideye::types::{Cli, Config, Stats};
 
-#[derive(Deserialize)]
-struct LoggingConfig {
-    path: String,
-    period_ms: u64,
-}
-
-#[derive(Parser)]
-struct Cli {
-    #[arg(short, long, default_value = "config/default.toml")]
-    config: String,
-
-    #[arg(long, default_value = "info", value_parser = ["debug", "info"])]
-    log_level: String,
-}
-
-#[derive(Default)]
-struct State {
-    mouse_distance: i64,
-    wheel_distance: i64,
-    button_presses: i64,
-    key_presses: i64,
-}
 
 fn init_logger(log_level: &str) {
     let level = match log_level.to_lowercase().as_str() {
@@ -71,7 +46,7 @@ fn main() {
     info!("Log level: {}", args.log_level);
     info!("Logging to {} every {} milliseconds", log_path, log_period);
 
-    let state_for_event_listener = Arc::new(Mutex::new(State::default()));
+    let state_for_event_listener = Arc::new(Mutex::new(Stats::default()));
     let state_for_logger = Arc::clone(&state_for_event_listener);
 
     thread::spawn(move || {
@@ -96,16 +71,15 @@ fn main() {
     }
 }
 
-fn event_listener(state: Arc<Mutex<State>>, rx: crossbeam_channel::Receiver<EventType>) {
-    let mut first_mouse_move = true;
+fn event_listener(stats: Arc<Mutex<Stats>>, rx: crossbeam_channel::Receiver<EventType>) {
     let mut last_mouse_pos = (0.0, 0.0);
     for event in rx {
-        let mut s = state.lock().expect("Mutex poisoned while locking state");
-        process_event(event, &mut s, &mut first_mouse_move, &mut last_mouse_pos);
+        let mut s = stats.lock().expect("Mutex poisoned while locking state");
+        process_event(event, &mut s, &mut last_mouse_pos);
     }
 }
 
-fn logger_thread(log_path: String, log_period: u64, state: Arc<Mutex<State>>) {
+fn logger_thread(log_path: String, log_period: u64, state: Arc<Mutex<Stats>>) {
     loop {
         thread::sleep(std::time::Duration::from_millis(log_period));
 
@@ -161,7 +135,7 @@ fn logger_thread(log_path: String, log_period: u64, state: Arc<Mutex<State>>) {
             .expect("Failed to seek start");
         write!(file, "{}", data).expect("Failed to write updated JSON");
 
-        *s = State::default();
+        *s = Stats::default();
     }
 }
 
@@ -176,40 +150,4 @@ fn add_field(val: &mut Value, key: &str, json_update: &Value) {
         key, update, current
     );
     val[key] = json!(current + update);
-}
-
-fn process_event(
-    event: EventType,
-    s: &mut State,
-    first_mouse_move: &mut bool,
-    last_mouse_pos: &mut (f64, f64),
-) {
-    match event {
-        EventType::MouseMove { x, y } => {
-            let mut distance = 0.0;
-            if !*first_mouse_move {
-                distance = ((x - last_mouse_pos.0).powi(2) + (y - last_mouse_pos.1).powi(2)).sqrt();
-                debug!(
-                    "Mouse moved from ({}, {}) to ({}, {}), Distance: {}",
-                    last_mouse_pos.0, last_mouse_pos.1, x, y, distance
-                );
-                *last_mouse_pos = (x, y);
-            } else {
-                *last_mouse_pos = (x, y);
-                *first_mouse_move = false;
-            }
-            s.mouse_distance += distance as i64; // losing 1 pixel of precision here doesn't matter
-        }
-        EventType::Wheel { delta_x, delta_y } => {
-            s.wheel_distance += delta_x.abs() + delta_y.abs();
-            debug!("Wheel moved by ({}, {})", delta_x, delta_y);
-        }
-        EventType::ButtonPress(_) => s.button_presses += 1,
-        EventType::KeyPress(_) => s.key_presses += 1,
-        _ => {}
-    }
-    debug!(
-        "Mouse Distance: {}, Wheel Spins: {}, Button Presses: {}, Key Presses: {}",
-        s.mouse_distance, s.wheel_distance, s.button_presses, s.key_presses
-    );
 }

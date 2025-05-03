@@ -431,21 +431,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 
 [[package]]
-name = "my_app"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "clap",
- "crossbeam-channel",
- "env_logger",
- "log",
- "rdev",
- "serde",
- "serde_json",
- "toml",
-]
-
-[[package]]
 name = "num-traits"
 version = "0.2.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -468,6 +453,21 @@ name = "once_cell"
 version = "1.21.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "42f5e15c9953c5e4ccceeb2e7382a716482c34515315f7b03532b8b4e8393d2d"
+
+[[package]]
+name = "oxideye"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "clap",
+ "crossbeam-channel",
+ "env_logger",
+ "log",
+ "rdev",
+ "serde",
+ "serde_json",
+ "toml",
+]
 
 [[package]]
 name = "pkg-config"
