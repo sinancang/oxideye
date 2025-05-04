@@ -2,18 +2,6 @@
 
 **oxideye** records and logs **computer peripheral usage stats** (think mouse distance, key/button press, etc.) so you can brag to your friends about how many miles your mouse has travelled
 
----
-**Currently** the program logs:
-- Mouse distance (in pixels)
-- Wheel spins
-- Button presses
-- Key presses
-
----
-**Down the line** I intend to add:
-- CLI tool to easily access the stats, as well as fun-facts (e.g. "if you had a cent for each time you pressed a key, you'd have $X!")
-- Notifications on milestones (when stats exceed certain thresholds)
-- Stat sharing across multiple devices
 
 ## Usage
 
@@ -34,4 +22,4 @@ cargo run -- --log-level debug
 ```
 
 ### Let it run!
-oxideye will, by default write logs to `oxideye/telem.json` every `100000` milliseconds. Both of these are configurable via modifying `config/default.toml`
+oxideye will, by default flush stats to `./data/YYYYMMDD_telem.json` every `10000` milliseconds. The stats directory (`data`), as well postfix (`telem`) can be configured via `config/default.toml`.

@@ -4,7 +4,7 @@ use crossbeam_channel::unbounded;
 use env_logger::Builder;
 use log::{LevelFilter, debug, error, info};
 use rdev::{Event, EventType, listen};
-use serde_json::{Value, Map, json, to_string_pretty};
+use serde_json::{Value, json, to_string_pretty};
 use std::fs;
 use std::fs::OpenOptions;
 use std::io::{Read, Seek, Write};
@@ -152,16 +152,7 @@ fn logger_thread(
         file.seek(std::io::SeekFrom::Start(0))
             .expect("Failed to seek start");
 
-        // Reorder JSON fields
-        let mut ordered = Map::new();
-        ordered.insert("timestamp".to_string(), data["timestamp"].clone());
-        ordered.insert("mouse_distance".to_string(), data["mouse_distance"].clone());
-        ordered.insert("wheel_spins".to_string(), data["wheel_spins"].clone());
-        ordered.insert("button_presses".to_string(), data["button_presses"].clone());
-        ordered.insert("key_presses".to_string(), data["key_presses"].clone());
-        
-        let ordered_value = Value::Object(ordered);
-        let pretty = to_string_pretty(&ordered_value).expect("Failed to serialize JSON");
+        let pretty = to_string_pretty(&data).expect("Failed to serialize JSON");
         write!(file, "{}", pretty).expect("Failed to write updated JSON");
 
         *s = Stats::default();

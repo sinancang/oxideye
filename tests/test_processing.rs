@@ -28,7 +28,6 @@ impl Drop for TestContext {
     }
 }
 
-
 #[test]
 fn test_calculate_mouse_distance() {
     let dist = calculate_mouse_distance(0.0, 0.0, 3.0, 4.0);
@@ -45,19 +44,33 @@ fn test_calculate_wheel_spins() {
 fn test_process_mouse_move() {
     let mut ctx = TestContext::new();
 
-    process_event(EventType::MouseMove { x: 0.0, y: 0.0 }, &mut ctx.stats, &mut ctx.last_mouse_pos);
+    process_event(
+        EventType::MouseMove { x: 0.0, y: 0.0 },
+        &mut ctx.stats,
+        &mut ctx.last_mouse_pos,
+    );
     assert_eq!(ctx.stats.mouse_distance, 0);
 
-    process_event(EventType::MouseMove { x: 3.0, y: 4.0 }, &mut ctx.stats, &mut ctx.last_mouse_pos);
+    process_event(
+        EventType::MouseMove { x: 3.0, y: 4.0 },
+        &mut ctx.stats,
+        &mut ctx.last_mouse_pos,
+    );
     assert_eq!(ctx.stats.mouse_distance, 5);
 }
-
 
 #[test]
 fn test_process_wheel_event() {
     let mut ctx = TestContext::new();
 
-    process_event(EventType::Wheel { delta_x: 3, delta_y: -4 }, &mut ctx.stats, &mut ctx.last_mouse_pos);
+    process_event(
+        EventType::Wheel {
+            delta_x: 3,
+            delta_y: -4,
+        },
+        &mut ctx.stats,
+        &mut ctx.last_mouse_pos,
+    );
     assert_eq!(ctx.stats.wheel_distance, 7);
 }
 
@@ -65,7 +78,11 @@ fn test_process_wheel_event() {
 fn test_process_button_press() {
     let mut ctx = TestContext::new();
 
-    process_event(EventType::ButtonPress(rdev::Button::Left), &mut ctx.stats, &mut ctx.last_mouse_pos);
+    process_event(
+        EventType::ButtonPress(rdev::Button::Left),
+        &mut ctx.stats,
+        &mut ctx.last_mouse_pos,
+    );
     assert_eq!(ctx.stats.button_presses, 1);
 }
 
@@ -73,6 +90,10 @@ fn test_process_button_press() {
 fn test_process_key_press() {
     let mut ctx = TestContext::new();
 
-    process_event(EventType::KeyPress(rdev::Key::KeyA), &mut ctx.stats, &mut ctx.last_mouse_pos);
+    process_event(
+        EventType::KeyPress(rdev::Key::KeyA),
+        &mut ctx.stats,
+        &mut ctx.last_mouse_pos,
+    );
     assert_eq!(ctx.stats.key_presses, 1);
 }
