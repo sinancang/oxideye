@@ -3,12 +3,13 @@ use serde::Deserialize;
 
 #[derive(Deserialize)]
 pub struct Config {
-    pub logging: LoggingConfig,
+    pub stats: StatsConfig,
 }
 
 #[derive(Deserialize)]
-pub struct LoggingConfig {
-    pub path: String,
+pub struct StatsConfig {
+    pub dir: String,
+    pub postfix: String,
     pub period_ms: u64,
 }
 

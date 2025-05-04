@@ -1,3 +1,4 @@
-[logging]
-path = "telem.json"
+[stats]
+dir = "data"
+postfix = "telem"
 period_ms = 10000
