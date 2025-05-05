@@ -1,4 +1,4 @@
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -10,16 +10,32 @@ pub struct Config {
 pub struct StatsConfig {
     pub dir: String,
     pub postfix: String,
-    pub period_ms: u64,
 }
 
 #[derive(Parser)]
+#[command(name = "peripheral-daemon")]
 pub struct Cli {
-    #[arg(short, long, default_value = "config/default.toml")]
-    pub config: String,
+    #[command(subcommand)]
+    pub command: Commands,
+}
 
-    #[arg(long, default_value = "info", value_parser = ["debug", "info"])]
-    pub log_level: String,
+#[derive(Subcommand)]
+pub enum Commands {
+    Start {
+        #[arg(short, long, default_value = "config/default.toml")]
+        config: String,
+
+        #[arg(short, long, default_value = "daemon_log.txt")]
+        log_file: String,
+
+        #[arg(long, default_value = "info", value_parser = ["debug", "info"])]
+        log_level: String,
+
+        #[arg(long, default_value = "1000")]
+        period_ms: u64,
+    },
+
+    Stop,
 }
 
 #[derive(Default)]
