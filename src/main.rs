@@ -11,8 +11,11 @@ use std::io::{Read, Seek, Write};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use oxideye::processing::process_event;
-use oxideye::types::{Cli, Config, Stats};
+mod processing;
+use crate::processing::process_event;
+
+mod types;
+use crate::types::{Cli, Config, Stats};
 
 fn init_logger(log_level: &str) {
     let level = match log_level.to_lowercase().as_str() {

@@ -55,4 +55,3 @@ Setup a remote server that people can upload/load their telemetry data to/from.
     - Config loading
     - Logging logic
     - Error handling
-- `processing` and `types` really shouldn’t be public modules…
