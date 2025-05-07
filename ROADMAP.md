@@ -53,5 +53,4 @@ Setup a remote server that people can upload/load their telemetry data to/from.
 
 - Unit tests for:
     - Config loading
-    - Logging logic
     - Error handling
