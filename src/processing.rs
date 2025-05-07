@@ -1,6 +1,8 @@
 use log::debug;
 use rdev::EventType;
 
+use serde_json::{Value, json};
+
 use crate::types::Stats;
 
 pub fn calculate_mouse_distance(x1: f64, y1: f64, x2: f64, y2: f64) -> f64 {
@@ -38,6 +40,30 @@ pub fn process_event(event: EventType, s: &mut Stats, last_mouse_pos: &mut (f64,
         "Mouse Distance: {}, Wheel Spins: {}, Button Presses: {}, Key Presses: {}",
         s.mouse_distance, s.wheel_distance, s.button_presses, s.key_presses
     );
+}
+
+/// Merge the latest sample (`update`) into the running total (`existing`).
+/// • timestamp is always **replaced**  
+/// • counters are **accumulated** (ignored if the increment is 0)
+pub fn merge_stats(mut existing: Value, update: &Value) -> Value {
+    if let Some(ts) = update.get("timestamp") {
+        existing["timestamp"] = ts.clone();
+    }
+
+    for k in [
+        "mouse_distance",
+        "wheel_spins",
+        "button_presses",
+        "key_presses",
+    ] {
+        if let Some(add) = update.get(k).and_then(Value::as_i64) {
+            if add != 0 {
+                let cur = existing.get(k).and_then(Value::as_i64).unwrap_or(0);
+                existing[k] = json!(cur + add);
+            }
+        }
+    }
+    existing
 }
 
 #[cfg(test)]
@@ -138,5 +164,49 @@ mod tests {
             &mut ctx.last_mouse_pos,
         );
         assert_eq!(ctx.stats.key_presses, 1);
+    }
+
+    #[test]
+    fn into_empty() {
+        let res = merge_stats(
+            json!({}),
+            &json!({
+                "timestamp": 1, "mouse_distance": 5, "wheel_spins": 2,
+                "button_presses": 3, "key_presses": 4
+            }),
+        );
+        assert_eq!(res["timestamp"], 1);
+        assert_eq!(res["wheel_spins"], 2);
+        assert_eq!(res["button_presses"], 3);
+        assert_eq!(res["key_presses"], 4);
+        assert_eq!(res["mouse_distance"], 5);
+    }
+
+    #[test]
+    fn accumulates_counters() {
+        let res = merge_stats(
+            json!({ "timestamp": 0, "wheel_spins": 1 }),
+            &json!({ "timestamp": 9, "wheel_spins": 2 }),
+        );
+        assert_eq!(res["wheel_spins"], 3);
+        assert_eq!(res["timestamp"], 9);
+    }
+
+    #[test]
+    fn updates_timestamp() {
+        let res = merge_stats(
+            json!({ "timestamp": 0, "wheel_spins": 1 }),
+            &json!({ "timestamp": 9, "wheel_spins": 2 }),
+        );
+        assert_eq!(res["timestamp"], 9);
+    }
+
+    #[test]
+    fn skips_zero() {
+        let res = merge_stats(
+            json!({ "timestamp": 0, "key_presses": 7 }),
+            &json!({ "timestamp": 3, "key_presses": 0 }),
+        );
+        assert_eq!(res["key_presses"], 7);
     }
 }

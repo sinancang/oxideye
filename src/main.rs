@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 mod processing;
-use crate::processing::process_event;
+use crate::processing::{merge_stats, process_event};
 
 mod types;
 use crate::types::{Cli, Config, Stats};
@@ -131,25 +131,14 @@ fn logger_thread(
         file.read_to_string(&mut contents)
             .expect("Failed to read file");
 
-        let data: Value = if contents.trim().is_empty() {
-            debug!(
-                "File is empty, creating new JSON object with initial values: {}",
-                json_update
-            );
-            json_update.clone()
+        let existing: Value = if contents.trim().is_empty() {
+            json!({})
         } else {
-            let mut val: Value = serde_json::from_str(&contents).unwrap_or(json!({}));
-            debug!(
-                "Timestamp updated: from {} to {}",
-                val["timestamp"], json_update["timestamp"]
-            );
-            val["timestamp"] = json_update["timestamp"].clone();
-            add_field(&mut val, "mouse_distance", &json_update);
-            add_field(&mut val, "wheel_spins", &json_update);
-            add_field(&mut val, "button_presses", &json_update);
-            add_field(&mut val, "key_presses", &json_update);
-            val
+            serde_json::from_str(&contents)
+                .expect("Failed to parse existing JSON")
         };
+
+        let data = merge_stats(existing, &json_update);
 
         file.set_len(0).expect("Failed to truncate file");
         file.seek(std::io::SeekFrom::Start(0))
@@ -160,17 +149,4 @@ fn logger_thread(
 
         *s = Stats::default();
     }
-}
-
-fn add_field(val: &mut Value, key: &str, json_update: &Value) {
-    let update = json_update.get(key).and_then(Value::as_i64).unwrap_or(0);
-    if update == 0 {
-        return;
-    }
-    let current = val.get(key).and_then(Value::as_i64).unwrap_or(0);
-    debug!(
-        "Adding field `{}` with value {} to {}",
-        key, update, current
-    );
-    val[key] = json!(current + update);
 }
